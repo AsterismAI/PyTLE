@@ -25,6 +25,7 @@
 from datetime import datetime, timedelta
 import numpy as np
 import PyTLE
+from PyTLE.mapper import mapper
 
 # -------------------------------------------------------------
 #def generate_fake_GEO( ):
@@ -39,28 +40,41 @@ from PyTLE.utils import julian
 # common fields
 # TODO
 # NOTE: in from_array below, we assume that the new range is 0-1 (modulo operator), this should be fixed if we want this to be variable
+
 MAP = [
         #( human name, data struct name, range, map-to-range)
-        ('mean_motion',     '_mm'       ,[0,20]     ,[0,1] ),
-        ('eccentricity',    '_ecc'      ,[1e-15,1]  ,[0,1] ),
-        ('inclination',     '_incl'     ,[0,180]    ,[0,1] ),
-        ('argp',            '_argp'     ,[0,360]    ,[0,1] ),
-        ('raan',            '_raan'     ,[0,360]    ,[0,1] ),
-        ('mean_anomaly',    '_ma'       ,[0,360]    ,[0,1] ),
-        ('n_dot',           '_ndot'     ,[-1,1]     ,[0,1] ),
-        ('n_dot_dot',       '_ndotdot'  ,[-1,1]     ,[0,1] )
+        ('mean_motion',     '_mm'       , mapper( [0,20]    ,[0,1] ) ),
+        ('eccentricity',    '_ecc'      , mapper( [1e-15,1] ,[0,1] ) ),
+        ('inclination',     '_incl'     , mapper( [0,180]   ,[0,1] ) ),
+        ('argp',            '_argp'     , mapper( [0,360]   ,[0,1], range1_period=360, range2_period=1 ) ),
+        ('raan',            '_raan'     , mapper( [0,360]   ,[0,1], range1_period=360, range2_period=1 ) ),
+        ('mean_anomaly',    '_ma'       , mapper( [0,360]   ,[0,1], range1_period=360, range2_period=1 ) ),
+        ('n_dot',           '_ndot'     , mapper( [-1,1]    ,[0,1] ) ),
+        ('n_dot_dot',       '_ndotdot'  , mapper( [-1,1]    ,[0,1] ) )
         ]
 
+#MAP = [
+#        #( human name, data struct name, range, map-to-range)
+#        ('mean_motion',     '_mm'       ,[0,20]     ,[0,1] ),
+#        ('eccentricity',    '_ecc'      ,[1e-15,1]  ,[0,1] ),
+#        ('inclination',     '_incl'     ,[0,180]    ,[0,1] ),
+#        ('argp',            '_argp'     ,[0,360]    ,[0,1] ),
+#        ('raan',            '_raan'     ,[0,360]    ,[0,1] ),
+#        ('mean_anomaly',    '_ma'       ,[0,360]    ,[0,1] ),
+#        ('n_dot',           '_ndot'     ,[-1,1]     ,[0,1] ),
+#        ('n_dot_dot',       '_ndotdot'  ,[-1,1]     ,[0,1] )
+#        ]
+
 # for type 0/2
-MAP_T0  = MAP + [ ('Bstar','_bstar',[-1,1],[0,1] ) ]
+MAP_T0  = MAP + [ ('Bstar','_bstar',mapper( [-1,1],[0,1] )) ]
 NAME_T0 = { X[0] : i for i,X in enumerate(MAP_T0) }
 POS_T0  = { i : X[0] for i,X in enumerate(MAP_T0) }
 N_T0    = len(MAP_T0)
 
 # for type 4
 MAP_T4 = MAP + [ 
-        ('Bterm',           '_B',       [-1,1]      ,[0,1] ),
-        ('AGOM',            '_agom',    [1e-15,100] ,[0,1] ) 
+        ('Bterm',           '_B',       mapper([-1,1]      ,[0,1] ) ),
+        ('AGOM',            '_agom',    mapper([1e-15,100] ,[0,1] ) )
         ]
 NAME_T4 = { X[0] : i for i,X in enumerate(MAP_T4) }
 POS_T4  = { i : X[0] for i,X in enumerate(MAP_T4) }
@@ -115,8 +129,10 @@ class tle_fitter( PyTLE.TLE ):
         if self._tle._type == 4 : return MAP_T4
 
     def _val_to_mapval( self, M ):
-        human, field, orig_range, new_range = M
-        return np.interp( getattr(self._tle,field), orig_range, new_range )
+        human, field, fmap = M
+        # use the mapper to get the value
+        return fmap.forward( getattr( self._tle,field) )
+        #return np.interp( getattr(self._tle,field), orig_range, new_range )
 
     def to_array( self ):
         return np.array( [ self._val_to_mapval(X) for X in self.get_map() ] )
@@ -160,10 +176,11 @@ class tle_fitter( PyTLE.TLE ):
         # assume that order is preserved
         MAP = self.get_map()
         for i,M in enumerate(MAP): 
-            human, field, orig_range, new_range = M
+            human, field, fmap= M
             # map it back to the range
-            val = (array[i] + 1) % 1   # <---- TODO: this should auto-range, assumed 1 for now 
-            setattr(self._tle,field,np.interp( val, new_range, orig_range ) )
+            #val = (array[i] + 1) % 1   # <---- TODO: this should auto-range, assumed 1 for now 
+            #setattr(self._tle,field,np.interp( val, new_range, orig_range ) )
+            setattr( self._tle, field, fmap.backward( array[i] ) )
         if satno : self._tle.satno = satno
         if note  : self._tle.set_note( note )
         if epoch : self._tle.epoch = epoch
@@ -228,7 +245,7 @@ def test() :
     eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
 
         # init as if we only had a state-vector
-    FIT = tle_fitter(TLE.fromPV( epoch=tledate, P=eph[0,0:3], V=eph[0,3:] ) )
+    FIT = tle_fitter(PyTLE.TLE.fromPV( epoch=tledate, P=eph[0,0:3], V=eph[0,3:] ) )
     print()
     print( str(FIT) )
 

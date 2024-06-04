@@ -34,7 +34,7 @@ from .formatters import epoch_str_todatetime, datetime_to_epochstr
 WGS84  = 398600.5
 gL1    = '1 25544U 98067A   23137.83559306  .00011914  00000-0  21418-3 0  9990'
 gL2    = '2 25544  51.6409 118.9691 0006630 359.0829  72.4864 15.50282135397083'
-gEPOCH = datetime.fromisoformat('2000-01-01T00:00:00.000') 
+gEPOCH = datetime.fromisoformat('2000-01-01T12:00:00.000') 
 
 # -----------------------------------------------------------------------------------------------------
 def format_ecc( ecc ):

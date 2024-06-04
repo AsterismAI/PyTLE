@@ -37,10 +37,8 @@ from PyTLE.mapper import mapper
 
 from PyTLE.utils import julian
 
-# common fields
-# TODO
-# NOTE: in from_array below, we assume that the new range is 0-1 (modulo operator), this should be fixed if we want this to be variable
-
+# this version uses the mapper to move values into and out of the proper range
+# mostly this is done to AVOID wrapping inclination (not much use to a solver)
 MAP = [
         #( human name, data struct name, range, map-to-range)
         ('mean_motion',     '_mm'       , mapper( [0,20]    ,[0,1] ) ),
@@ -211,43 +209,97 @@ def test() :
     from sgp4.io import twoline2rv
     from sgp4.propagation import sgp4 as sgprop
 
-    # Aerocube 12A
+    # test data
     L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
+    print()
+    print('TEST INPUT: \n{}\n{}'.format(L1,L2))
 
     # parse the TLE and wrap a fitter
     TEST = tle_fitter( PyTLE.TLE.parseLines( L1, L2 ) )
-    print('Str of fitter')
-    print(str(TEST))
+    print(TEST.epoch)  # <------------------
+    nL1,nL2 = TEST.generateLines()
+    print()
+    print('-'*100)
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
+
+    print('Parsed and re-generated')
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
+
 
     # get array and then parse back into structure
     arr = TEST.to_array()
-    print('Array: {}'.format(arr))
-    print('Re-injecting...')
-    TEST.from_array( arr )
-    print(str(TEST))
+    print()
+    print('-'*100)
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
 
-    print('Modifying entries and re-injecting (wrap test)')
-    N = len(arr)
-    mod =arr + np.ones(N) * 0.7
-    print( TEST.from_array( mod ) ) 
+    print()
+    print('-'*100)
+    print('Array format: {}'.format(arr))
+    print('Injecting array and generating blank TLE (note that epoch will be empty)')
+    TEST2 = tle_fitter( ).from_array( arr )
+    nL1,nL2 = TEST2.generateLines()
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
 
+
+    print()
+    print('-'*100)
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
+
+    print('Adding 0.5 to all array entries.')
+    mod = arr + np.ones( len(arr) ) * 0.7
+    nL1,nL2 = TEST.from_array(mod).generateLines()
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
 
 
     # test ephemeris
-    tle = twoline2rv( L1, L2, wgs72 )
     print()
-    print('tle epoch is ', julian.from_jd( tle.jdsatepoch ) )
+    print('-'*100)
+    print('Ephemeris test : \n{}\n{}'.format( L1, L2 ))
+    tle = twoline2rv( L1, L2, wgs72 )
     tledate = julian.from_jd( tle.jdsatepoch )
-    
-    mins   = np.arange(0,1440*5,10)
+    print('tle epoch (parse TLE -> julian -> datetime)', tledate )
+    fd = float( L1[23:32] )
+    td = datetime.strptime(L1[18:23], '%y%j' ) + timedelta( days=fd )
+    print('tle epoch (datetime parse of TLE )         ', td )
+    mins   = np.arange(0,2,1)
     jdates = tle.jdsatepoch + mins/1440
     eph = np.vstack( [np.hstack( sgprop(tle,D)) for D in mins ] )
+    for t,p in zip( mins, eph ):print(t,p)
 
-        # init as if we only had a state-vector
-    FIT = tle_fitter(PyTLE.TLE.fromPV( epoch=tledate, P=eph[0,0:3], V=eph[0,3:] ) )
+    # init as if we only had a state-vector
     print()
-    print( str(FIT) )
+    print('-'*100)
+    print('Generating TLE from state vector at epoch (OSCULATING elements)')
+    Q = PyTLE.TLE.fromPV( epoch=tledate, P=eph[0,0:3], V=eph[0,3:] )
+    FIT = tle_fitter(PyTLE.TLE.fromPV( epoch=tledate, P=eph[0,0:3], V=eph[0,3:] ) )
+    FIT.epoch = tledate
+    nL1,nL2 = FIT.generateLines()
+    print('original: {}'.format( L1 ) )
+    print('new     : {}'.format( nL1 ))
+    print('original: {}'.format( L2 ) )
+    print('new     : {}'.format( nL2 ))
+
+
+    
 
 
 # =====================================================================================================

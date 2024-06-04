@@ -58,16 +58,27 @@ def epoch_str_todatetime( S ):
     year = int(S[0:2])
     if year > 57: tyear = datetime( year=1900+year, month=1, day=1 )
     if year < 57: tyear = datetime( year=2000+year, month=1, day=1 )
-    frac = float( S[2:] )
+    # https://celestrak.org/columns/v04n03/
+    # While talking about the epoch, this is perhaps a good place to answer the other time-related questions. First, how is the epoch time format interpreted? 
+    # This question is best answered by using an example. 
+    # An epoch of 98001.00000000 corresponds to 0000 UT on 1998 January 01—in other words, midnight between 1997 December 31 and 1998 January 01. 
+    # An epoch of 98000.00000000 would actually correspond to the beginning of 1997 December 31—strange as that might seem. 
+    # Note that the epoch day starts at UT midnight (not noon) and that all times are measured mean solar rather than sidereal time units (the answer to our third question).
+    frac = float( S[2:] ) - 1
     return tyear + timedelta( days=frac )
 
 # -----------------------------------------------------------------------------------------------------
 def datetime_to_epochstr( dt ):
     tyear = datetime(year=dt.year, day=1, month=1 )
-    frac = (dt - tyear).total_seconds() / 86400.
+    frac = (dt - tyear).total_seconds() / 86400. 
     days = int(frac)
     decimals = frac - days 
     decimals = '{}'.format(np.round( decimals, 8 )).split('.')[1]
     year = dt.strftime('%y')[:2]
-    days = '{:03d}'.format(days)[:3]
+    days = '{:03d}'.format(days+1)[:3]
     return '{}{}.{}'.format( year, days, decimals )
+
+
+# =====================================================================================================
+if __name__ == "__main__":
+    print( epoch_str_todatetime('22000.0'))

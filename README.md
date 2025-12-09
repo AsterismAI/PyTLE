@@ -3,12 +3,19 @@
 Kerry N. Wood (kerry.n.wood@gmail.com)
 
 #### PyTLE.TLE
+<<<<<<< HEAD
 - routines to parse, store, and re-generate two line TLE 
+=======
+- routines to parse, store, and re-generate two line TLE  (type 0 and 4)
+>>>>>>> packaging
 - data fields are stored in their native units (e.g. degrees for RAAN, inclination, etc)
 - convenience routines for initializing *new* TLE
 	* `fromCOE` : from classical osculating elements
 	* `fromPV`  : from state vectors (in native frame and units / TEME / km / km/s)
+<<<<<<< HEAD
 	* `fromPoliastro` : from Poliastro orbit object
+=======
+>>>>>>> packaging
 
 #### PyTLE.tle_fitter
 - wraps `PyTLE.TLE` and maps TLE fields to ranges useful for optimization 

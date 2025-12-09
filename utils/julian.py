@@ -1,7 +1,31 @@
 # https://github.com/dannyzed/julian/blob/master/julian/julian.py
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 import unittest
+import numpy as np
+from numpy.typing import NDArray
+
+
+# # ------ abusing datetime with epochs
+# _J2K_EPOCH_JD  = 2451545.0
+# _J2K_EPOCH_DT  = datetime( year=2000, month=1, day=1, hour=12 )
+
+# def datetime_to_jd( dts : list[ datetime ] ) -> NDArray[np.float64] :
+#     return [ _J2K_EPOCH_JD + (( X -_J2K_EPOCH_DT ).total_seconds() / 86400.) for X in dts ]
+
+# def jd_to_datetime( jds : NDArray[np.float64] ) -> list[ datetime ] :
+#     return np.array( [ _J2K_EPOCH_DT + timedelta(seconds=(X-_J2K_EPOCH_JD) * 86400 ) for X in jds ] )
+
+
+# _UNIX_EPOCH_DT = datetime( 1970, 1, 1 )
+# _UNIX_EPOCH_JD = 2440587.5
+
+# def datetime_to_unix( dts : list[ datetime ] ) -> NDArray[np.float64] :
+#     return [ ( X-_UNIX_EPOCH_DT ).total_seconds for X in dts ]
+
+# def unix_to_datetime( jds : NDArray[np.float64] ) -> list[ datetime ] :
+#     return np.array( [ _UNIX_EPOCH_DT + timedelta(seconds=X) for X in jds ] )
+
 
 def to_jd(dt: datetime) -> float:
     """
@@ -91,7 +115,38 @@ class Testing( unittest.TestCase ):
         print( 'Max delta tojd (seconds) {:10.8f}'.format( self.np.max(diff_days) * 86400 ) )
         self.assertTrue( self.np.max( diff_days ) < 1/86400. )
 
-# =====================================================================================================
+# # -----------------------------------------------------------------------------------------------------
+# class Testing( unittest.TestCase ):
+#     @classmethod
+#     def setUpClass(self):
+#         import astropy.time
+#         import numpy as np
+#         self.np = np
+#         self._ref_jds = self.np.arange( astropy.time.Time('2000-01-01T00:00:00.000Z',format='isot').jd,
+#                                         astropy.time.Time.now().jd, 
+#                                         0.1 )
+        
+#         self._ref_dts = astropy.time.Time( self._ref_jds, format='jd').datetime
+
+#     def test_fromjd(self):
+#         test_dt = jd_to_datetime( self._ref_jds )
+#         diff_seconds = [ (ref - test).total_seconds()
+#                          for ref,test in zip( self._ref_dts, test_dt ) ]
+#         idx = self.np.argmax( diff_seconds )
+#         print('Max delta fromjd (seconds) {:10.8f} at time {}'.format( diff_seconds[idx], test_dt[idx] ) )      
+#         for dt,df in zip( test_dt, diff_seconds):
+#             if df > 0.1: print('JULIAN to DATETIME difference : {} {}'.format( dt, df )) 
+#         self.assertTrue( self.np.max(diff_seconds) < 1 )
+
+#     def test_tojd(self):
+#         test_jd = datetime_to_jd( self._ref_dts )
+#         diff_days = [ ref - test for ref,test in zip( self._ref_jds, test_jd ) ]
+#         print( 'Max delta tojd (seconds) {:10.8f}'.format( self.np.max(diff_days) * 86400 ) )
+#         for refdt,test,ref,diff in zip( self._ref_dts, test_jd, self._ref_jds, diff_days):
+#             if diff > 1/86400: print('DATETIME to JULIAN difference : {} {} {} {}'.format( refdt, test, ref, diff )) 
+#         self.assertTrue( self.np.max( diff_days ) < 1/86400. )
+
+# # =====================================================================================================
 if __name__ == '__main__' :
     unittest.main()
     # now = datetime.utcnow()

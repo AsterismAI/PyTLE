@@ -111,7 +111,7 @@ class tle_fitter( PyTLE.TLE ):
     @satno.setter
     def satno( self, newno ) : 
         # TODO : support for alpha
-        assert newno > 0 and newno < 99999
+        assert newno > 0 and newno <= 99999
         self._tle.satno = newno
 
     def set_satno( self, satno ):

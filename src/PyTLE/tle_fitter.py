@@ -126,6 +126,10 @@ class tle_fitter( PyTLE.TLE ):
         if self._tle._type == 0 or self._tle._type == 2: return MAP_T0
         if self._tle._type == 4 : return MAP_T4
 
+    def get_tle_fields( self ):
+        tmap = self.get_map()
+        return { X[0] : getattr( self._tle, X[1]) for X in tmap }
+
     def _val_to_mapval( self, M ):
         human, field, fmap = M
         # use the mapper to get the value

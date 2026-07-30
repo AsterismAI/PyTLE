@@ -40,6 +40,20 @@ gEPOCH = datetime.fromisoformat('2000-01-01T12:00:00.000')
 def format_ecc( ecc ):
     return '{:9.7f}'.format(ecc)[2:].ljust(7,'0')
 
+
+# -----------------------------------------------------------------------------------------------------
+def calculate_tle_checksum(line: str) -> int:
+    """Calculates the modulo-10 checksum for a single TLE line."""
+    # Only evaluate the first 68 characters to ignore the trailing checksum digit itself
+    line_to_check = line[:68]
+    total = 0
+    for char in line_to_check:
+        if char.isdigit():
+            total += int(char)
+        elif char == '-':
+            total += 1
+    return str(total % 10)[:1]
+
 # -----------------------------------------------------------------------------------------------------
 class TLE:
     def __init__(self, L1=None, L2=None):
@@ -163,6 +177,7 @@ class TLE:
 
     @staticmethod 
     def parseLines( L1, L2 ):
+        print('found',L1[62])
         if L1[62] == '0' or L1[62] == '2' : return TLE_2( L1, L2 )
         if L1[62] == '4' : return TLE_4( L1, L2 )
 
@@ -330,8 +345,6 @@ class TLE_2( TLE ):
                 0,  # <--------- TYPE FLAG
                 "{}".format( self._elset ).rjust(4,' ')
                 )
-
-                #self._elset )
         return L1
 
     def generateLine2( self ):
@@ -347,6 +360,7 @@ class TLE_2( TLE ):
                 "{:>011.8f}".format( self._mm)[:12], 
                 "{:04d}".format( self._elset)[:4]
                 )
+
         return L2
     
     def generateLines( self ):
@@ -397,6 +411,9 @@ class TLE_4( TLE ):
                 generate_expo_format( self._B ),
                 "{:d}".format( self._elset).rjust(4,'0')[-4:]
                  )
+
+        checksum = calculate_tle_checksum( L1 )
+        L1 += checksum
         return L1
 
     def generateLine2( self ):
@@ -412,6 +429,8 @@ class TLE_4( TLE ):
                 "{:>011.8f}".format( self._mm)[:12], 
                 "{:d}".format( self._elset).rjust(4,'0')[-4:]
                 )
+        checksum = calculate_tle_checksum( L2 )
+        L2 += checksum
         return L2
     
     def generateLines( self ):

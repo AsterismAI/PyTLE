@@ -177,7 +177,6 @@ class TLE:
 
     @staticmethod 
     def parseLines( L1, L2 ):
-        print('found',L1[62])
         if L1[62] == '0' or L1[62] == '2' : return TLE_2( L1, L2 )
         if L1[62] == '4' : return TLE_4( L1, L2 )
 

@@ -285,7 +285,6 @@ def test() :
     print('Generating TLE from state vector at epoch (propagate to epoch, make a TLE from that state vector)')
     print('-'*100)
     print('\t-> these are OSCULATING elements, so do not expect a one-to-one')
-    Q = PyTLE.TLE.fromPV( epoch=tledate, P=P, V=V )
     FIT = tle_fitter(PyTLE.TLE.fromPV( epoch=tledate, P=P, V=V ) )
     FIT.epoch = tledate
     nL1,nL2 = FIT.generateLines()

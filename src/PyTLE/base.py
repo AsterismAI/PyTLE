@@ -22,7 +22,8 @@
 # SOFTWARE.
 # ###############################################################################
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
+import pprint
 from sgp4.ext import rv2coe
 import numpy as np
 
@@ -103,7 +104,7 @@ class TLE:
     @satno.setter
     def satno( self, newno ) : 
         # TODO : support for alpha
-        assert newno > 0 and newno < 99999
+        assert newno > 0 and newno < 340000
         self._satno = newno
 
     @property
@@ -515,23 +516,30 @@ def demo():
     print()
     print('Reparsing ORIGINAL and outputting dict')
     Y = TLE.parseLines( L1, L2 )
-    print(Y.__dict__)
+    pprint.pprint(Y.__dict__)
 
-    X = TLE.fromCOE( datetime.utcnow() ).set_note('fromCOE')
+    #X = TLE.fromCOE( datetime.utcnow() ).set_note('fromCOE')
+    now = datetime.now( UTC ).replace( tzinfo=None )
+    X = TLE.fromCOE( now ).set_note('fromCOE')
     print('From COE:')
     print('\n'.join( X.generateLines())) 
 
     P = [9000,0,0]
     V = [0,8,0.001]
     print('\nFrom P: {} V: {}'.format( P, V ))
-    X = TLE.fromPV( datetime.utcnow(), P, V,
+    now = datetime.now( UTC ).replace( tzinfo=None )
+    X = TLE.fromPV( now, P, V,
                         type = 0 )
                         
     L1,L2 = X.generateLines()
     print(L1)
     print(L2)
     T = twoline2rv(L1,L2,wgs72)
+    print()
     print('Repropagated to epoch: {}'.format( sgprop(T,0)) )
+
+    X.satno = 339999
+    print(X)
     
     
 

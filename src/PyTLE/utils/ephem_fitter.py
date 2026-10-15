@@ -30,6 +30,19 @@ def opt( X, fitR, offsets_m, truth_eph ):
     return rms
 
 # ----------------------------------------------------------------------------------------------------- 
+class ephem_fitter:
+    def __init__( self , init_tle : PyTLE.TLE ):
+        ''' 
+        you must pass in an initial TLE that will be fit to (you can set the epoch on that 
+        new TLE when constructing that object
+        '''
+        self._tle   = init_tle
+        self._ephem = None 
+    
+    def set_ephem( self, ephem ):
+
+
+# ----------------------------------------------------------------------------------------------------- 
 def reepochTLE( L1 : str, L2 : str, 
                newepoch : datetime,
                SPAN = 10, 

@@ -22,7 +22,7 @@
 # SOFTWARE.
 # ###############################################################################
 
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone 
 import pprint
 from sgp4.ext import rv2coe
 import numpy as np
@@ -519,7 +519,7 @@ def demo():
     pprint.pprint(Y.__dict__)
 
     #X = TLE.fromCOE( datetime.utcnow() ).set_note('fromCOE')
-    now = datetime.now( UTC ).replace( tzinfo=None )
+    now = datetime.now( timezone.UTC ).replace( tzinfo=None )
     X = TLE.fromCOE( now ).set_note('fromCOE')
     print('From COE:')
     print('\n'.join( X.generateLines())) 
@@ -527,7 +527,7 @@ def demo():
     P = [9000,0,0]
     V = [0,8,0.001]
     print('\nFrom P: {} V: {}'.format( P, V ))
-    now = datetime.now( UTC ).replace( tzinfo=None )
+    now = datetime.now( timezone.UTC ).replace( tzinfo=None )
     X = TLE.fromPV( now, P, V,
                         type = 0 )
                         

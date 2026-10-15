@@ -74,10 +74,15 @@ if __name__ == '__main__':
     L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
 
+    old  = tle_fitter( TLE.parseLines( L1, L2 ) )
+    print('Old epoch is         {}'.format( old.epoch) )
+    newe = datetime(year=2023, month=2, day=1 )
+    print('Setting new epoch of {}'.format( newe ) )
     #L1 = '1 25544U 98067A   25343.50984768  .00014141  00000-0  26026-3 0  9994'
     #L2 = '2 25544  51.6310 158.4724 0003400 223.8185 136.2534 15.49447168542357'
 
-    X = reepochTLE( L1, L2, datetime(year=2023, month=2, day=1 ) )
+    X = reepochTLE( L1, L2, newe )
+    print()
     print('OLD')
     print('\n'.join([L1,L2]))
     print('NEW')

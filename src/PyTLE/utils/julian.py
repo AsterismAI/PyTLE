@@ -19,13 +19,19 @@ def julian_to_datetime(jd: float) -> datetime.datetime:
 if __name__ == '__main__':
     import pandas as pd
     
+    N           = 10000
     NOW         = datetime.datetime.now()
-    in_dates    = np.array( [ NOW + datetime.timedelta( days=X ) for X in np.random.uniform( 0, 365*100, 1000 ) ] )
-    jd_dates    = [ datetime_to_julian( X ) for X in in_dates ]
-    out_dates   = [ julian_to_datetime( X ) for X in jd_dates ] 
-
-    for A,B,C in zip( in_dates, jd_dates, out_dates ):
-        print(A,B,C)
-        D = pd.to_datetime(A).to_julian_date() 
-        print( julian_to_datetime(D))
+    in_dates    = np.array( [ NOW + datetime.timedelta( days=X ) for X in np.random.uniform( 0, 365*100, N ) ] )
+    
+    print('Actual, Computed Julian, Pandas Julian, Re-convert')
+    for D in in_dates:
+        computed = datetime_to_julian(D)
+        print('{} {} {} {} {}'.format(
+            D,
+            computed,
+            pd.to_datetime(D).to_julian_date(),
+            julian_to_datetime(computed),
+            (D - julian_to_datetime(computed) ).total_seconds()
+            )
+        )
 

@@ -1,13 +1,14 @@
 from datetime import timedelta, datetime
 import numpy as np
+import scipy.optimize
+
 from sgp4.io import twoline2rv
 from sgp4.earth_gravity import wgs72
 from sgp4.propagation import sgp4 as sgprop
-import scipy.optimize
 
+import PyTLE
 from PyTLE import tle_fitter
-from PyTLE import TLE
-
+from PyTLE.utils import julian
 
 # ----------------------------------------------------------------------------------------------------- 
 def propTLE( L1, L2, offsets_m ):
@@ -17,8 +18,17 @@ def propTLE( L1, L2, offsets_m ):
     return eph
 
 # ----------------------------------------------------------------------------------------------------- 
-def opt( X, fitR, offsets_m, truth_eph ):
-    fitR.from_array( X )
+def propTLEtoJD( L1, L2, JD ):
+    # tle object
+    tleo  = twoline2rv( L1, L2, wgs72 )
+    off_m = (JD - tleo.jdsatepoch) * 1440 
+    eph   = np.vstack( [ np.hstack( sgprop(tleo,X) ) for X in off_m ] )
+    eph   = np.hstack( (JD[:,np.newaxis], eph ) )
+    return eph
+
+# ----------------------------------------------------------------------------------------------------- 
+def opt( X, fitR, offsets_m, truth_eph, fields, verbose=True ):
+    fitR.from_fields( fields, X )
     try : 
         L1, L2 = fitR.generateLines()
         eph = propTLE( L1, L2, offsets_m )
@@ -26,78 +36,85 @@ def opt( X, fitR, offsets_m, truth_eph ):
     diff = eph[:,0:3] - truth_eph[:,0:3]
     diff = np.linalg.norm( diff, axis=1 )
     rms  = np.sqrt( np.sum( diff**2 ) / len(diff) )
-    print('{:015.10f}                        '.format( rms ) ,end='\r') 
+    if verbose:
+        print('Points : {}  RMS: {:015.8f} RMS per point: {:015.8f}          '.format( 
+                len(diff), rms, rms/len(diff) ) ,end='\r') 
     return rms
 
 # ----------------------------------------------------------------------------------------------------- 
-class ephem_fitter:
-    def __init__( self , init_tle : PyTLE.TLE ):
-        ''' 
-        you must pass in an initial TLE that will be fit to (you can set the epoch on that 
-        new TLE when constructing that object
-        '''
-        self._tle   = init_tle
-        self._ephem = None 
-    
-    def set_ephem( self, ephem ):
-
-
-# ----------------------------------------------------------------------------------------------------- 
-def reepochTLE( L1 : str, L2 : str, 
-               newepoch : datetime,
-               SPAN = 10, 
-               SPACING = 5 ):
-    # parse the TLE 
-    old = tle_fitter( TLE.parseLines( L1, L2 ) )
-    new = tle_fitter( TLE.parseLines( L1, L2 ) )
-
-    # NOTE: we have two different epochs here
-    #   (1) is from the original TLE to the interval that we will fit
-    #   (2) is the offset from the NEW TLE to those data that we will fit
-    #   we precompute them for efficiency (or we can stuff dates in here)
-
-    # with the new epoch set, find the minutes offset so that we can propagate
-    offset_mid   = ( newepoch - old.epoch ).total_seconds() / 60
-    offset_m     = np.arange( offset_mid - (1440*(SPACING/2)),
-                              offset_mid + (1440*(SPACING/2)),
-                              SPACING )
-
-    # this is for the *new* TLE
-    new_offset_m = offset_m - offset_mid
-
-    # truth ephemeris for the new interval
-    truth_eph = propTLE( L1, L2, offset_m )
-    
-    # set new values
-    new.epoch = newepoch
-    new.satno = 99998
+def fit_ephemeris( ephemeris : np.array, init_tle : tle_fitter, fields = None ):
+    L1,L2  = init_tle.generateLines()
+    new    = tle_fitter( PyTLE.TLE.parseLines( L1, L2 ) )
+    tle_jd = julian.datetime_to_julian( new.epoch )
+    eph_jd = ephemeris[:,0]
+    eph_pv = ephemeris[:,1:]
+    off_m  = 1440 * ( eph_jd - tle_jd )
+    if fields is None:
+        fields = new.get_available_field_names()
+    initX  = new.get_fields( fields ) 
+    initS  = initX * np.random.normal( 1, 0.05, size=( len(initX) + 1, len(initX) ) )
+    initS[0,:] = initX
     ans = scipy.optimize.minimize( opt,
-                                  new.to_array(),
-                                  args = (new, new_offset_m, truth_eph ),
-                                  method = 'Nelder-Mead' )
+                initX,
+                args = (new, off_m, eph_pv, fields ),
+                method = 'Nelder-Mead',
+                options = {'fatol' : 0.1, 'xatol' : 10 }) # 'initial_simplex' : initS })
     if ans.success : 
-        new = new.from_array( ans.x ) 
-        return new
-
+        return new.from_fields( fields, ans.x ) 
     return None
 
+# ----------------------------------------------------------------------------------------------------- 
+def reepochTLE( init_tle    : tle_fitter, 
+                new_epoch   : datetime,
+                eph_spacing : int = 5,
+                days_around : int = 7): 
+    assert isinstance( init_tle, tle_fitter )
+    new_jd    = julian.datetime_to_julian( new_epoch ) + np.arange( -days_around, days_around+0.0001, eph_spacing/1440 )
+    L1, L2    = init_tle.generateLines()
+    new_eph   = propTLEtoJD( L1, L2, new_jd)
+    middle    = new_eph[ new_eph.shape[0] // 2, :]
+    jd, P, V  = middle[0], middle[1:4], middle[4:]
+    temp_tle  = init_tle.fromPV( julian.julian_to_datetime( jd ), P, V )
+    print(init_tle.generateLines())
+    init_tle  = init_tle.from_array( temp_tle.to_array() )
+    print(init_tle.generateLines())
+    # this is a bad idea; we're just setting the new epoch and not modifying any other orbit elements
+    # for now though, just brute-force it
+    
+    return fit_ephemeris( new_eph, init_tle, None )
+  
+# -----------------------------------------------------------------------------------------------------   
+def test_reepoch():
+    L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
+    L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
+    init_tle  = tle_fitter( PyTLE.TLE.parseLines( L1, L2 ) )
+    newepoch  = datetime(year=2023, month=1, day=20 )
+    newtle = reepochTLE( init_tle, newepoch, eph_spacing=5, days_around=10 )
+    newtle.satno = 99999
+    print('Re-epoch test, re-epoching :')
+    print('\n'.join( init_tle.generateLines() ) )
+    print('To : {}'.format( newepoch ))
+    print('\n'.join( newtle.generateLines() ) )
+    print()
+
+# -----------------------------------------------------------------------------------------------------   
+def test_fitephem():
+    L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
+    L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
+    init_tle  = PyTLE.TLE.parseLines( L1, L2 )
+    new_jd    = julian.datetime_to_julian( init_tle.epoch ) + np.arange( 90, 90+14, 5/1440 )
+    new_eph   = propTLEtoJD( L1, L2, new_jd)
+    new_tle   = PyTLE.TLE.fromPV( julian.julian_to_datetime(new_eph[0,0]),
+                                 new_eph[0,1:4], new_eph[0,4:])
+    new_tle = fit_ephemeris( new_eph, new_tle,['mean_motion','mean_anomaly'] )
+    print('Fit 14 day span over 5 day intervals; moved epoch 90 days')
+    print(L1)
+    print(L2)
+    print(new_tle)
+    
 
 # ----------------------------------------------------------------------------------------------------- 
 if __name__ == '__main__':
-    L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
-    L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
-
-    old  = tle_fitter( TLE.parseLines( L1, L2 ) )
-    print('Old epoch is         {}'.format( old.epoch) )
-    newe = datetime(year=2023, month=2, day=1 )
-    print('Setting new epoch of {}'.format( newe ) )
-    #L1 = '1 25544U 98067A   25343.50984768  .00014141  00000-0  26026-3 0  9994'
-    #L2 = '2 25544  51.6310 158.4724 0003400 223.8185 136.2534 15.49447168542357'
-
-    X = reepochTLE( L1, L2, newe )
-    print()
-    print('OLD')
-    print('\n'.join([L1,L2]))
-    print('NEW')
-    print('\n'.join( X.generateLines() ) )
+    test_reepoch()
+    # test_fitephem()
 

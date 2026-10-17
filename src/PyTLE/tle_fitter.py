@@ -89,7 +89,7 @@ class tle_fitter( PyTLE.TLE ):
         if inTLE is None:
             if tletype == 0 : self._tle = PyTLE.TLE.get_type0()
             if tletype == 4 : self._tle = PyTLE.TLE.get_type4()
-        else: self._tle = inTLE
+        else: self._tle  = inTLE
 
     def get_type4( self ):
         self._tle = PyTLE.TLE.get_type4()
@@ -125,7 +125,7 @@ class tle_fitter( PyTLE.TLE ):
     def get_map( self ):
         if self._tle._type == 0 or self._tle._type == 2: return MAP_T0
         if self._tle._type == 4 : return MAP_T4
-
+        
     def get_tle_fields( self ):
         tmap = self.get_map()
         return { X[0] : getattr( self._tle, X[1]) for X in tmap }
@@ -136,6 +136,9 @@ class tle_fitter( PyTLE.TLE ):
         return fmap.forward( getattr( self._tle,field) )
         #return np.interp( getattr(self._tle,field), orig_range, new_range )
 
+    def get_available_field_names( self ):
+        return list( self.name_to_pos().keys() )
+    
     def to_array( self ):
         return np.array( [ self._val_to_mapval(X) for X in self.get_map() ] )
 

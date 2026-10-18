@@ -158,9 +158,11 @@ class TLE:
     def AGOM( self, agom ):
         self._agom = agom
 
-    def set_note( self, note : str ):
+    @property
+    def note( self ) : return self._intld
+    @note.setter
+    def note( self, note : str ):
         self._intld = note[:8]
-        return self
         
     @property
     def perigee( self ):
@@ -175,20 +177,12 @@ class TLE:
     def parseDate( self, S ):
         ''' assume this is just the date string '''
         self._epoch = epoch_str_todatetime( S )
-
-    @staticmethod 
-    def parseLines( L1, L2 ):
-        if L1[62] == '0' or L1[62] == '2' : return TLE_2( L1, L2 )
-        if L1[62] == '4' : return TLE_4( L1, L2 )
-
-    @staticmethod
-    def get_type0( ):
-        return TLE_2()
-
-    @staticmethod
-    def get_type4( ):
-        return TLE_4()
-
+ 
+    def parseLines( self, L1, L2 ):
+        if L1[62] == '0' or L1[62] == '2' : 
+            return self._parse_type0( L1, L2 )
+        if L1[62] == '4' : 
+            return self._parse_type4( L1, L2 )
 
     def _calculate_apogee_perigee( self, earth_rad = 6378.135):
         ''' Default value for earth_rad is taken from space-track.
@@ -209,11 +203,14 @@ class TLE:
         self._apogee =  ( semi_major * (1 + self.eccentricity) ) - earth_rad
 
 
-    @staticmethod
-    def fromCOE(epoch : datetime,
-                type  : int = 0,
-                satno : int = 99999,
-                a=7000, ecc=1e-10, incl=1e-3, argp=0, raan=0, mean_anomaly=0,   # COE elements
+    def fromCOE( self,
+                epoch : datetime,
+                a     : float = 7000, 
+                ecc   : float = 1e-10, 
+                incl  : float = 1e-3, 
+                argp  : float = 0, 
+                raan  : float = 0, 
+                mean_anomaly : float = 0,   # COE elements
                 bstar : float = 0,                                              # TLE type 0/2 only
                 bterm : float  = 0,
                 agom  : float  = 0,
@@ -222,38 +219,27 @@ class TLE:
         '''
         degrees and km
         '''
-        if type == 0 or type == 2: 
-            tle = TLE_2()
-            tle._bstar = bstar
-        if type == 4 : 
-            tle = TLE_4()
-            tle._B = bterm
-            tle._agom = agom
-        if a < 0:
-            print('cannot init from COE with semi-major axis (a) < 0')
-            return tle 
-        tle._satno = satno
-        tle._incl = incl
-        tle._ecc  = ecc
-        tle._argp = argp
-        tle._raan = raan 
-        tle._ma   = mean_anomaly
+        self._incl = incl
+        self._ecc  = ecc
+        self._argp = argp
+        self._raan = raan 
+        self._ma   = mean_anomaly
         # calculate the mean motion (these are km values, so we get rads/s, convert to TLE units)
         mm = np.sqrt(EARTHMU / a ** 3)
-        tle._mm = (mm * 86400) / (2 * np.pi)
-        tle._epoch = epoch
-        return tle
+        self._mm = (mm * 86400) / (2 * np.pi)
+        self._epoch = epoch
+        if bstar : self._bstar = bstar
+        if bterm : self._bterm = bterm
+        if agom  : self._agom  = agom
+        return self
 
-
-    @staticmethod
-    def fromPV(epoch : datetime, 
+    def fromPV(self,
+               epoch : datetime, 
                P : np.array,
                V : np.array,
-               type : int = 0,
-               satno : int = 99999,
-               bstar : float = 0,                                              # TLE type 0/2 only
-               bterm : float  = 0,
-               agom  : float  = 0,
+               bstar : float = None,
+               bterm : float = None,
+               agom  : float = None,
                EARTHMU : float = WGS84,
                **kwargs):
         '''
@@ -263,23 +249,23 @@ class TLE:
         # return p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper
         if V[2] == 0:
             raise Exception('cannot init an orbit with perfectly zero inclination (velocity[Z] ~ 1e-5km/s minimum)')
-            return TLE.fromCOE( epoch, type=type, satno=satno )
 
         try: p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper = rv2coe(P, V, EARTHMU )
         except Exception as e:
             print('could not init TLE from P: {} V: {}'.format( P,V ) )
-            return TLE.fromCOE( epoch, type=type, satno=satno )
+            return None
+            # return TLE.fromCOE( epoch, type=type, satno=satno )
 
         # rv2coe in sgp4 returns > 999999 to indicate undefined or infinite... (see code)
         if any( (X > 999999. for X in [p,a,ecc,incl,omega,argp,nu,m] ) ):
             print('rv2coe returned undefined (> 999999) value')
             print([p,a,ecc,incl,omega,argp,nu,m] )
+            return None
             return TLE.fromCOE( epoch , type=type)
 
         # a = 7000, ecc = 1e-10, incl = 1e-3, argp = 0, raan = 0, mean_anomaly = 0,
-        return TLE.fromCOE( epoch, 
-                type=type, 
-                satno=satno, 
+        return self.fromCOE( 
+                epoch, 
                 a=a, 
                 ecc=ecc, 
                 incl=np.degrees(incl), 
@@ -295,18 +281,19 @@ class TLE:
     def __str__( self ): return '\n'.join( self.generateLines() )
     
     def __repr__( self ): return str(self)
-
-
-
-
-# -----------------------------------------------------------------------------------------------------
-class TLE_2( TLE ):
-    def __init__(self, L1=None, L2=None):
-        self.clear()
-        if L1 and L2: self.parseLines(L1,L2)
-        self._type = 0
-
-    def parseLine1( self, S ):
+    
+    def generateLines( self ):
+        if self._type == 0 or self._type == 2 :
+            return self._type0_generateLine1(), self._type0_generateLine2()
+        if self._type == 4 :
+                return self._type4_generateLine1(), self._type4_generateLine2()
+    
+    def _parse_type0( self, L1, L2 ):
+        self._type0_parseLine1( L1 )
+        self._type0_parseLine2( L2 )
+        return self
+    
+    def _type0_parseLine1( self, S ):
         if S[0] != '1' : raise Exception('LINE1 must begin with 1')
         self._satno = alpha_to_integer( S[2:7] )
         self._class = S[7]
@@ -317,8 +304,8 @@ class TLE_2( TLE ):
         self._bstar  = process_expo_format( S[53:61] )
         self._type   = int(S[62])
         self._elset = int(S[64:68])
-    
-    def parseLine2( self, S ):
+
+    def _type0_parseLine2( self, S ):
         if S[0] != '2' : raise Exception('LINE2 must begin with 2')
         if alpha_to_integer( S[2:7] ) != self._satno : raise Exception('satno does not match')
         self._incl = float(S[8:16])
@@ -327,12 +314,8 @@ class TLE_2( TLE ):
         self._argp = float(S[34:42])
         self._ma   = float(S[43:51])
         self._mm   = float(S[52:63])
-
-    def parseLines( self, L1, L2 ):
-        self.parseLine1( L1 )
-        self.parseLine2( L2 )
-
-    def generateLine1( self ):
+        
+    def _type0_generateLine1( self ):
         #1 25544U 98067A   23137.83559306  .00011914  00000-0  21418-3 0  9990
         L1 = '1 {:5}{:1} {:8} {:14} {} {} {} {} {}0'.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
@@ -347,7 +330,7 @@ class TLE_2( TLE ):
                 )
         return L1
 
-    def generateLine2( self ):
+    def _type0_generateLine2( self ):
         #L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
         L2 = '2 {:5} {:8} {:8} {:7} {:8} {:8} {} {}3 '.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
@@ -360,22 +343,15 @@ class TLE_2( TLE ):
                 "{:>011.8f}".format( self._mm)[:12], 
                 "{:04d}".format( self._elset)[:4]
                 )
-
         return L2
-    
-    def generateLines( self ):
-        return ( self.generateLine1(), self.generateLine2() )
 
 
+    def _parse_type4( self, L1, L2 ):
+        self._type4_parseLine1( L1 )
+        self._type4_parseLine2( L2 )
+        return self
 
-# -----------------------------------------------------------------------------------------------------
-class TLE_4( TLE ):
-    def __init__(self, L1=None, L2=None):
-        self.clear()
-        if L1 and L2: self.parseLines(L1,L2)
-        self._type = 4
-
-    def parseLine1( self, S ):
+    def _type4_parseLine1( self, S ):
         if S[0] != '1' : raise Exception('LINE1 must begin with 1')
         self._satno = alpha_to_integer( S[2:7] )
         self._class = S[7]
@@ -386,7 +362,7 @@ class TLE_4( TLE ):
         self._type = int(S[62])
         self._elset = int(S[64:68])
     
-    def parseLine2( self, S ):
+    def _type4_parseLine2( self, S ):
         if S[0] != '2' : raise Exception('LINE2 must begin with 2')
         if alpha_to_integer( S[2:7] ) != self._satno : raise Exception('satno does not match')
         self._incl = float(S[8:16])
@@ -395,12 +371,8 @@ class TLE_4( TLE ):
         self._argp = float(S[34:42])
         self._ma   = float(S[43:51])
         self._mm   = float(S[52:63])
-
-    def parseLines( self, L1, L2 ):
-        self.parseLine1( L1 )
-        self.parseLine2( L2 )
-
-    def generateLine1( self ):
+        
+    def _type4_generateLine1( self ):
         #L1='1 12345U xyzzyz   23038.45547454 +.00000000 +46171+0 +33000-1 4 99992'
         L1 = '1 {:5}{:1} {:8} {:14} +.00000000 {} {} 4 {}'.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
@@ -416,7 +388,7 @@ class TLE_4( TLE ):
         L1 += checksum
         return L1
 
-    def generateLine2( self ):
+    def _type4_generateLine2( self ):
         #L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
         L2 = '2 {:5} {:8} {:8} {:7} {:8} {:8} {} {}'.format(
                 integer_to_alpha( self._satno ).rjust(5,'0'),
@@ -432,9 +404,8 @@ class TLE_4( TLE ):
         checksum = calculate_tle_checksum( L2 )
         L2 += checksum
         return L2
-    
-    def generateLines( self ):
-        return ( self.generateLine1(), self.generateLine2() )
+
+
 
 # -----------------------------------------------------------------------------------------------------
 def demo():
@@ -443,6 +414,9 @@ def demo():
     from sgp4.propagation import sgp4 as sgprop
     L1='1 12345U xyzzyz   23038.45547454 +.00000000 +46171+0 +33000-1 4 99992'
     L2='2 12345   9.7332 113.4837 7006332 206.5371  38.9576 01.00149480000003'
+    
+    def printTLE( TLE ):
+        print('\n'.join( TLE.generateLines() ) )
 
     print('-----------------------------------------------------------------------------------------------------')
     print('Original TLE')
@@ -454,35 +428,36 @@ def demo():
     print('-----------------------------------------------------------------------------------------------------')
     print('Type 4 testing')
     print('CODE: test = TLE.parseLines( L1, L2 )')
-    test = TLE.parseLines( L1, L2 )
+    test = TLE().parseLines( L1, L2 )
+    lines = test.generateLines()
     print('original   ', L1)
-    print('generated  ',test.generateLine1())
+    print('generated  ',lines[0] )
     print('original   ',L2)
-    print('generated  ',test.generateLine2())
+    print('generated  ',lines[1])
+    
 
     print()
-    print('Setting international designator to {}'.format( 'ABC123' ))
-    test._intld = 'ABC123'
-    print('generated  ',test.generateLine1())
-    print('generated  ',test.generateLine2())
-    print('Setting international designator to {}'.format('ABCDEFGHIJKLMNO'))
-    test._intld = 'ABCDEFGHIJKLMNO'
-    print('generated  ',test.generateLine1())
-    print('generated  ',test.generateLine2())
-
+    print('Setting international designator / note to {}'.format( 'ABC123' ))
+    test.note = 'ABC123'
+    lines = test.generateLines()
+    printTLE( test )
+    
+    print('Setting international designator / note to {}'.format('ABCDEFGHIJKLMNO'))
+    test.note = 'ABCDEFGHIJKLMNO'
+    printTLE( test )
+    
+        
     print()
     RAAN = 15000000
     print('Setting RAAN to {}'.format( RAAN ))
     test.raan = RAAN
-    print('generated  ',test.generateLine1())
-    print('generated  ',test.generateLine2())
+    printTLE( test )
 
     print()
     AGOM = 10e6
     print('Setting AGOM to {}'.format(AGOM))
     test._agom = AGOM
-    print('generated  ',test.generateLine1())
-    print('generated  ',test.generateLine2())
+    printTLE( test )
 
 
     print('-----------------------------------------------------------------------------------------------------')
@@ -490,45 +465,49 @@ def demo():
     print('CODE: test = TLE.parseLines( L1, L2 )')
     L1 = '1 25544U 98067A   23137.83559306  .00011914  00000-0  21418-3 0  9990'
     L2 = '2 25544  51.6409 118.9691 0006630 359.0829  72.4864 15.50282135397083'
-    test = TLE.parseLines( L1, L2 )
+    test = TLE().parseLines( L1, L2 )
+    lines = test.generateLines()
     print('original   ', L1)
-    print('generated  ',test.generateLine1())
+    print('generated  ',lines[0] )
     print('original   ',L2)
-    print('generated  ',test.generateLine2())
+    print('generated  ',lines[1] )
 
     print()
     print('Setting RAAN to 999999999')
-    test._raan = 999999999
+    test.raan = 999999999
+    lines = test.generateLines()
     print('original   ', L1)
-    print('generated  ',test.generateLine1())
+    print('generated  ',lines[0] )
     print('original   ',L2)
-    print('generated  ',test.generateLine2())
+    print('generated  ',lines[1] )
 
     print()
     print('Setting inclination to 999999999')
-    test._incl = 999999999
+    test.inclination = 999999999
+    lines = test.generateLines()
     print('original   ', L1)
-    print('generated  ',test.generateLine1())
+    print('generated  ',lines[0] )
     print('original   ',L2)
-    print('generated  ',test.generateLine2())
+    print('generated  ',lines[1] )
 
 
     print()
     print('Reparsing ORIGINAL and outputting dict')
-    Y = TLE.parseLines( L1, L2 )
+    Y = TLE().parseLines( L1, L2 )
     pprint.pprint(Y.__dict__)
 
     #X = TLE.fromCOE( datetime.utcnow() ).set_note('fromCOE')
-    now = datetime.now( timezone.UTC ).replace( tzinfo=None )
-    X = TLE.fromCOE( now ).set_note('fromCOE')
+    now = datetime.now( timezone.utc ).replace( tzinfo=None )
+    X = TLE().fromCOE( now )
+    X.note = 'fromCOE'
     print('From COE:')
     print('\n'.join( X.generateLines())) 
 
     P = [9000,0,0]
     V = [0,8,0.001]
     print('\nFrom P: {} V: {}'.format( P, V ))
-    now = datetime.now( timezone.UTC ).replace( tzinfo=None )
-    X = TLE.fromPV( now, P, V,
+    now = datetime.now( timezone.utc ).replace( tzinfo=None )
+    X = TLE().fromPV( now, P, V,
                         type = 0 )
                         
     L1,L2 = X.generateLines()
@@ -540,8 +519,7 @@ def demo():
 
     X.satno = 339999
     print(X)
-    
-    
+        
 
 # =====================================================================================================
 if __name__ == '__main__':

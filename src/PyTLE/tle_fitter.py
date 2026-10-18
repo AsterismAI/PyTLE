@@ -85,71 +85,29 @@ class tle_fitter( PyTLE.TLE ):
     '''
     convenience routines to map internal TLE fields to a range an optimizer can use (generally 0--1)
     '''
-    def __init__(self, inTLE : PyTLE.TLE = None , tletype : int = 0, fields=None):
-        if inTLE is None:
-            if tletype == 0 : self._tle = PyTLE.TLE.get_type0()
-            if tletype == 4 : self._tle = PyTLE.TLE.get_type4()
-        else: self._tle  = inTLE
-
-    def get_type4( self ):
-        self._tle = PyTLE.TLE.get_type4()
-        return self
-
-    @property 
-    def epoch( self ): return self._tle.epoch
-    
-    @epoch.setter
-    def epoch( self, epoch ): self._tle.epoch = epoch
-
-    def set_epoch( self, epoch ):
-        self._tle.epoch = epoch
-        return self
-
-    @property
-    def satno( self ): return self._tle.satno
-
-    @satno.setter
-    def satno( self, newno ) : 
-        # TODO : support for alpha
-        assert newno > 0 and newno <= 99999
-        self._tle.satno = newno
-
-    def set_satno( self, satno ):
-        self._tle.satno = satno
-        return self
-
-    def set_note( self, note ):
-        self._tle.set_note( note )
-        return self
-
-    def get_map( self ):
-        if self._tle._type == 0 or self._tle._type == 2: return MAP_T0
-        if self._tle._type == 4 : return MAP_T4
-        
-    def get_tle_fields( self ):
-        tmap = self.get_map()
-        return { X[0] : getattr( self._tle, X[1]) for X in tmap }
-
-    def _val_to_mapval( self, M ):
-        human, field, fmap = M
-        # use the mapper to get the value
-        return fmap.forward( getattr( self._tle,field) )
-        #return np.interp( getattr(self._tle,field), orig_range, new_range )
-
+    def __init__(self, in_arg  = None ):
+        super().__init__()
+              
     def get_available_field_names( self ):
         return list( self.name_to_pos().keys() )
     
-    def to_array( self ):
-        return np.array( [ self._val_to_mapval(X) for X in self.get_map() ] )
+    def _val_to_mapval( self, M ):
+        human, field, fmap = M
+        # use the mapper to get the value
+        return fmap.forward( getattr( self,field) )
+        
+    def get_map( self ):
+        if self._type == 0 or self_type == 2: return MAP_T0
+        if self._type == 4 : return MAP_T4
 
     def name_to_pos( self ):
-        if self._tle._type == 0 or self._tle._type == 2: return NAME_T0
-        if self._tle._type == 4 : return NAME_T4 
+        if self._type == 0 or self._type == 2: return NAME_T0
+        if self._type == 4 : return NAME_T4 
     
     def pos_to_name( self ):
-        if self._tle._type == 0 or self._tle._type == 2: return POS_T0
-        if self._tle._type == 4 : return POS_T4
-
+        if self._type == 0 or self._type == 2: return POS_T0
+        if self._type == 4 : return POS_T4
+        
     def get_fields( self, fields ):
         A      = self.to_array()
         N2P    = self.name_to_pos()
@@ -163,7 +121,17 @@ class tle_fitter( PyTLE.TLE ):
             A[ lookup[fname] ] = val
         self.from_array( A )
         return self
-            
+    
+    def to_array( self ):
+        return np.array( [ self._val_to_mapval(X) for X in self.get_map() ] )
+    
+    def from_array( self, array ):
+        # assume that order is preserved
+        for i,M in enumerate( self.get_map() ): 
+            human, field, fmap= M
+            setattr( self, field, fmap.backward( array[i] ) )
+        return self
+    
     def from_dict( self,  arr_dict ):
         ''' arr_dict = {'mean_motion' : 0.3, 'inclination' : 0.1...} '''
         A      = self.to_array()
@@ -176,127 +144,16 @@ class tle_fitter( PyTLE.TLE ):
     def to_dict( self ):
         A = self.to_array()
         return { X[0] : A[i] for i,X in enumerate( self.get_map() ) }
-
-    def from_array( self, array, note=None, satno=None, epoch=None ):
-        # assume that order is preserved
-        MAP = self.get_map()
-        for i,M in enumerate(MAP): 
-            human, field, fmap= M
-            # map it back to the range
-            #val = (array[i] + 1) % 1   # <---- TODO: this should auto-range, assumed 1 for now 
-            #setattr(self._tle,field,np.interp( val, new_range, orig_range ) )
-            setattr( self._tle, field, fmap.backward( array[i] ) )
-        if satno : self._tle.satno = satno
-        if note  : self._tle.set_note( note )
-        if epoch : self._tle.epoch = epoch
-        return self
-
-    def testme( self, **kwargs ):
-        print(kwargs)
-
-    @staticmethod
-    def parseLines( L1, L2 ):
-        return tle_fitter( PyTLE.TLE.parseLines(L1,L2) )
-
-    def __str__( self ):
-        return "\n".join( self._tle.generateLines() )
-    
-    def generateLine1( self ):
-        return self._tle.generateLine1() 
-
-    def generateLine2( self ):
-        return self._tle.generateLine2() 
-    
-    def generateLines( self ):
-        return self._tle.generateLines() 
-
-
-# -----------------------------------------------------------------------------------------------------
-def test() :
-    from sgp4.earth_gravity import wgs72
-    from sgp4.io import twoline2rv
-    from sgp4.propagation import sgp4 as sgprop
-
-    # test data
+# ------------------------------------------------------------------------------------------------------
+if __name__ == '__main__':
     L1 = '1 43556U 18046C   22321.55519027  .00025005  00000+0  49749-3 0  9993'
     L2 = '2 43556  51.6329 154.1269 0008144 222.8163 137.2191 15.46745497242947'
-    print()
-    print('TEST INPUT: \n{}\n{}'.format(L1,L2))
-
-    # parse the TLE and wrap a fitter
-    TEST = tle_fitter( PyTLE.TLE.parseLines( L1, L2 ) )
-    print(TEST.epoch)  # <------------------
-    nL1,nL2 = TEST.generateLines()
-    print()
-    print('-'*100)
-    print('Testing parsing and re-generation of TLE data (should be the same)')
-    print('-'*100)
-    print('original: {}'.format( L1 ) )
-    print('new     : {}'.format( nL1 ))
-    print('original: {}'.format( L2 ) )
-    print('new     : {}'.format( nL2 ))
-    print()
-
-    # get array and then parse back into structure
-    arr = TEST.to_array()
-    print('-'*100)
-    print('Testing parsing - > to array - > back to TLE')
-    print('-'*100)
-    print('Array format: {}'.format(arr))
-    print('Injecting array and generating blank TLE (note that epoch will be empty)')
-    TEST2 = tle_fitter( ).from_array( arr )
-    nL1,nL2 = TEST2.generateLines()
-    print('original: {}'.format( L1 ) )
-    print('new     : {}'.format( nL1 ))
-    print('original: {}'.format( L2 ) )
-    print('new     : {}'.format( nL2 ))
-    print()
-
-    print('-'*100)
-    print('Adding 0.5 to all ARRAY entries.')
-    print('-'*100)
-    mod = arr + np.ones( len(arr) ) * 0.7
-    nL1,nL2 = TEST.from_array(mod).generateLines()
-    print('original: {}'.format( L1 ) )
-    print('new     : {}'.format( nL1 ))
-    print('original: {}'.format( L2 ) )
-    print('new     : {}'.format( nL2 ))
-    print()
-
-    # test ephemeris
-    print('-'*100)
-    print('Testing epoch conversions and date formatting')
-    print('-'*100)
-    tle = twoline2rv( L1, L2, wgs72 )
-    tledate = julian.from_jd( tle.jdsatepoch )
-    print('tle epoch (parse TLE -> julian -> datetime)', tledate )
-    fd = float( L1[23:32] )
-    td = datetime.strptime(L1[18:23], '%y%j' ) + timedelta( days=fd )
-    print('tle epoch (datetime parse of TLE )         ', td )
-    P,V = sgprop( tle, 0 )
-
-    print()
-    print('-'*100)
-    print('Generating ephemeris for state-vector test : \n{}\n{}'.format( L1, L2 ))
-    print('-'*100)
-    print('epoch P : {}'.format( P ) )
-    print('epoch V : {}'.format( V ) )
-
-    # init as if we only had a state-vector
-    print()
-    print('-'*100)
-    print('Generating TLE from state vector at epoch (propagate to epoch, make a TLE from that state vector)')
-    print('-'*100)
-    print('\t-> these are OSCULATING elements, so do not expect a one-to-one')
-    FIT = tle_fitter(PyTLE.TLE.fromPV( epoch=tledate, P=P, V=V ) )
-    FIT.epoch = tledate
-    nL1,nL2 = FIT.generateLines()
-    print('original: {}'.format( L1 ) )
-    print('new     : {}'.format( nL1 ))
-    print('original: {}'.format( L2 ) )
-    print('new     : {}'.format( nL2 ))
-
-
-# =====================================================================================================
-if __name__ == '__main__':
-    test()
+    X = tle_fitter().parseLines( L1, L2)
+    print(X.get_map())
+    print(X.get_available_field_names())
+    print(X.to_array())
+    print( X.get_fields( X.get_available_field_names() ))
+    print( X.get_fields( X.get_available_field_names()[:3] ))
+    print(X.to_dict())
+    X.fromPV( datetime(year=2020,month=1,day=1), np.array([7000,0,0]), np.array([0,9,2] ))
+    print(X)

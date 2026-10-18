@@ -18,11 +18,9 @@ def julian_to_datetime(jd: float) -> datetime.datetime:
 # =====================================================================================================
 if __name__ == '__main__':
     import pandas as pd
-    
     N           = 10000
     NOW         = datetime.datetime.now()
     in_dates    = np.array( [ NOW + datetime.timedelta( days=X ) for X in np.random.uniform( 0, 365*100, N ) ] )
-    
     print('Actual, Computed Julian, Pandas Julian, Re-convert')
     for D in in_dates:
         computed = datetime_to_julian(D)

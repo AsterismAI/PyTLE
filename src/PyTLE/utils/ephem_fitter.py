@@ -2,29 +2,10 @@ from datetime import timedelta, datetime
 import numpy as np
 import scipy.optimize
 
-from sgp4.io import twoline2rv
-from sgp4.earth_gravity import wgs72
-from sgp4.propagation import sgp4 as sgprop
-
 import PyTLE
 from PyTLE import tle_fitter
 from PyTLE.utils import julian
-
-# ----------------------------------------------------------------------------------------------------- 
-def propTLE( L1, L2, offsets_m ):
-    # tle object
-    tleo = twoline2rv( L1, L2, wgs72 )
-    eph = np.vstack( [ np.hstack( sgprop(tleo,X) ) for X in offsets_m ] )
-    return eph
-
-# ----------------------------------------------------------------------------------------------------- 
-def propTLEtoJD( L1, L2, JD ):
-    # tle object
-    tleo  = twoline2rv( L1, L2, wgs72 )
-    off_m = (JD - tleo.jdsatepoch) * 1440 
-    eph   = np.vstack( [ np.hstack( sgprop(tleo,X) ) for X in off_m ] )
-    eph   = np.hstack( (JD[:,np.newaxis], eph ) )
-    return eph
+from PyTLE.utils.sgp4_helpers import propTLE, propTLEtoJD
 
 # ----------------------------------------------------------------------------------------------------- 
 def opt( X, fitR, offsets_m, truth_eph, fields, verbose=True ):

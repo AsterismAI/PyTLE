@@ -78,6 +78,12 @@ def datetime_to_epochstr( dt ):
     days = '{:03d}'.format(days+1)[:3]
     return '{}{}.{}'.format( year, days, decimals )
 
+# -----------------------------------------------------------------------------------------------------
+def generate_ndot( val ):
+    if val >= 0 : sign = '+'
+    else : sign = '-'
+    int, frac = '{:15.14f}'.format( val ).split('.')
+    return "{}.{}".format( sign, frac[:8])
 
 # =====================================================================================================
 if __name__ == "__main__":

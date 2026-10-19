@@ -29,7 +29,7 @@ import numpy as np
 
 from .alpha import alpha_to_integer, integer_to_alpha
 
-from .formatters import generate_expo_format, process_expo_format
+from .formatters import generate_expo_format, process_expo_format, generate_ndot
 from .formatters import epoch_str_todatetime, datetime_to_epochstr
 
 WGS84  = 398600.5
@@ -219,14 +219,14 @@ class TLE:
         '''
         degrees and km
         '''
-        self._incl = incl
-        self._ecc  = ecc
-        self._argp = argp
-        self._raan = raan 
-        self._ma   = mean_anomaly
+        self._incl  = incl
+        self._ecc   = ecc
+        self._argp  = argp
+        self._raan  = raan 
+        self._ma    = mean_anomaly
         # calculate the mean motion (these are km values, so we get rads/s, convert to TLE units)
-        mm = np.sqrt(EARTHMU / a ** 3)
-        self._mm = (mm * 86400) / (2 * np.pi)
+        mm          = np.sqrt(EARTHMU / a ** 3)
+        self._mm    = (mm * 86400) / (2 * np.pi)
         self._epoch = epoch
         if bstar : self._bstar = bstar
         if bterm : self._bterm = bterm
@@ -322,7 +322,8 @@ class TLE:
                 self._class[0],
                 self._intld[:8].rjust(8,' '),
                 datetime_to_epochstr( self._epoch ),
-                "{:09.8f}".format( self._ndot ).ljust(9,' '),
+                # "{:09.8f}".format( self._ndot ).ljust(9,' '),
+                generate_ndot( self._ndot) ,
                 generate_expo_format( self._ndotdot),
                 generate_expo_format( self._bstar ),
                 0,  # <--------- TYPE FLAG
